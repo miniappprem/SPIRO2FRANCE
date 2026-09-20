@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SPIRO2FRANCE</title>
+  
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --neon-blue: #0a84ff; /* Bleu iOS */
+      --neon-pink: #ff2d55; /* Rose iOS */
+      --neon-green: #30d158; /* Vert iOS */
+      --gold: #ffd60a;
+      --glass-bg: rgba(30, 30, 32, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --text-main: #ffffff;
+      --text-muted: #ebebf599;
+      --ios-radius: 24px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { 
+      margin: 0; padding: 0; min-height: 100%; 
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+      background: #000000; color: var(--text-main); overflow-x: hidden; 
+    }
+    body { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; cursor: pointer; outline: none; }
+    .hidden { display: none !important; }
+
+    /* TOAST NOTIFICATIONS (STYLE iOS) */
+    .toast-container {
+      position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+      background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+      border: 1px solid var(--glass-border); border-radius: 50px;
+      padding: 12px 24px; display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 9999;
+      transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      font-weight: 600; font-size: 14px; letter-spacing: 0.2px; white-space: nowrap;
+    }
+    .toast-container.show { top: max(20px, env(safe-area-inset-top)); }
+    .toast-icon { font-size: 18px; }
+
+    /* ANIMATION CANVAS FOND */
+    #networkCanvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; opacity: 0.4; pointer-events: none; }
+
+    /* HEADER & LOGO BANNIÈRE ANIMÉE */
+    .topbar {
+      position: sticky; top: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: max(15px, env(safe-area-inset-top)) 20px 15px; 
+      background: rgba(10, 10, 10, 0.5); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+      border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .banner-logo {
+      width: 120px; height: 120px; border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 15px 35px rgba(10, 132, 255, 0.3);
+      object-fit: cover; margin-bottom: 10px; background: #111;
+      animation: floatLogo 4s ease-in-out infinite;
+    }
+    @keyframes floatLogo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); box-shadow: 0 25px 45px rgba(10, 132, 255, 0.5); } }
+    
+    .brand-subtitle { 
+      background: linear-gradient(90deg, var(--neon-blue), var(--neon-green)); 
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      font-size: 12px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; 
+    }
+
+    /* LAYOUT & MENU DÉROULANT */
+    #app { width: 100%; max-width: 600px; margin: auto; }
+    .page { display: none; padding: 20px; }
+    .page.active { display: block; animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.97) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+    .custom-select {
+      width: 100%; padding: 16px 20px; border-radius: 18px; 
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      color: white; font-size: 16px; font-weight: 600; outline: none; 
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); margin-bottom: 25px;
+      appearance: none; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    /* CARTES DES ANNONCES (STYLE PREMIUM iOS) */
+    .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .place-card {
+      background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--ios-radius); 
+      padding: 12px; text-align: center; transition: 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); 
+      backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .place-card:active { transform: scale(0.92); opacity: 0.8; }
+    .place-image { width: 100%; height: 120px; object-fit: cover; border-radius: 16px; margin-bottom: 12px; }
+    .place-name { margin: 0 0 6px; font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+    
+    /* BADGE LUMINEUX ANIMÉ */
+    .badge-lumin { 
+      display: inline-block; font-size: 10px; padding: 5px 12px; border-radius: 20px; font-weight: 800;
+      background: rgba(48, 209, 88, 0.15); color: var(--neon-green); border: 1px solid rgba(48, 209, 88, 0.3);
+      box-shadow: 0 0 10px rgba(48, 209, 88, 0.2); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;
+    }
+
+    /* MODAL DÉTAILS ANNONCE */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      z-index: 1000; display: flex; align-items: flex-end; justify-content: center;
+      opacity: 0; pointer-events: none; transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: all; }
+    .modal-content {
+      background: rgba(25, 25, 27, 0.95); border-top: 1px solid var(--glass-border); border-radius: 35px 35px 0 0;
+      width: 100%; max-width: 600px; padding: 35px 25px max(35px, env(safe-area-inset-bottom)); position: relative; text-align: center;
+      transform: translateY(100%); transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-overlay.active .modal-content { transform: translateY(0); }
+    
+    .drag-indicator { width: 40px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 10px; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); }
+    .close-modal { position: absolute; top: 20px; right: 25px; background: rgba(255,255,255,0.1); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    
+    .modal-img { width: 110px; height: 110px; border-radius: 28px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 15px 30px rgba(0,0,0,0.5); object-fit: cover; margin-bottom: 15px; }
+    .modal-tags { display: flex; justify-content: center; gap: 8px; margin: 15px 0; }
+    .modal-tag { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+    .tag-sur-place { background: rgba(10, 132, 255, 0.15); color: var(--neon-blue); }
+    .tag-livraison { background: rgba(255, 45, 85, 0.15); color: var(--neon-pink); }
+    
+    .btn-action { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 16px; border-radius: 18px; font-size: 16px; font-weight: 700; margin-top: 12px; text-decoration: none; color: white; transition: 0.2s; }
+    .btn-action:active { transform: scale(0.96); }
+    .btn-telegram { background: var(--neon-blue); box-shadow: 0 8px 25px rgba(10, 132, 255, 0.4); }
+    .btn-vote { background: rgba(255, 255, 255, 0.1); border: 1px solid var(--glass-border); color: var(--gold); margin-top: 12px; }
+
+    /* PROFIL & STATS */
+    .user-profile-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--ios-radius); padding: 25px; text-align: center; margin-bottom: 20px; backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); }
+    .user-avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--neon-blue); object-fit: cover; margin-bottom: 12px; box-shadow: 0 10px 25px rgba(10, 132, 255, 0.3); }
+    .user-name { font-size: 22px; font-weight: 700; margin: 0 0 5px; letter-spacing: -0.5px; }
+    
+    .user-stats { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 18px; margin-top: 20px; }
+    .stat-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+    .stat-value { font-size: 16px; font-weight: 800; color: white; margin-top: 6px; }
+
+    /* CLAVIER TACTILE NUMERIQUE (STYLE iOS) */
+    .numpad-container { text-align: center; padding: 20px 10px; background: var(--glass-bg); border-radius: var(--ios-radius); border: 1px solid var(--glass-border); backdrop-filter: blur(25px); }
+    .pin-display { display: flex; justify-content: center; gap: 15px; margin-bottom: 30px; margin-top: 10px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--text-muted); transition: 0.2s; }
+    .pin-dot.filled { background: var(--neon-blue); border-color: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue); }
+    
+    .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 280px; margin: 0 auto; }
+    .numpad-btn { width: 75px; height: 75px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 400; color: white; transition: 0.1s; margin: auto; }
+    .numpad-btn:active { background: rgba(255,255,255,0.25); transform: scale(0.9); }
+    .numpad-btn.empty { background: transparent; pointer-events: none; }
+    
+    /* INPUTS ADMIN */
+    .input-style { width: 100%; padding: 16px; border-radius: 16px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: white; margin-bottom: 12px; font-weight: 500; font-size: 15px; outline: none; transition: 0.3s; }
+    .input-style:focus { border-color: var(--neon-blue); background: rgba(0,0,0,0.5); }
+    .btn-submit { width: 100%; padding: 16px; border-radius: 16px; background: var(--neon-blue); color: white; font-weight: 700; font-size: 16px; margin-bottom: 10px; transition: 0.2s; }
+    .btn-submit:active { transform: scale(0.96); }
+
+    /* CLASSEMENT & RESEAUX */
+    .ranking-row { display: flex; align-items: center; gap: 15px; padding: 16px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px; margin-bottom: 12px; backdrop-filter: blur(25px); }
+    .network-card { display: flex; align-items: center; gap: 16px; padding: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px; margin-bottom: 12px; text-decoration: none; color: white; transition: 0.2s; backdrop-filter: blur(25px); }
+    .network-card:active { transform: scale(0.95); background: rgba(255,255,255,0.1); }
+    .network-icon { font-size: 24px; width: 45px; height: 45px; border-radius: 14px; background: rgba(10, 132, 255, 0.15); display: flex; align-items: center; justify-content: center; color: var(--neon-blue); }
+    
+    /* NAV BAS FLOTTANTE (STYLE iOS) */
+    .bottom-nav-container { position: fixed; z-index: 50; left: 0; bottom: 0; width: 100%; padding: 0 20px calc(15px + env(safe-area-inset-bottom)); display: flex; justify-content: center; pointer-events: none; }
+    .bottom-nav { pointer-events: all; width: 100%; max-width: 400px; display: flex; justify-content: space-between; padding: 12px 20px; background: rgba(20, 20, 22, 0.85); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid rgba(255,255,255,0.1); border-radius: 35px; box-shadow: 0 15px 40px rgba(0,0,0,0.6); }
+    .nav-button { display: flex; flex-direction: column; align-items: center; gap: 4px; background: transparent; color: var(--text-muted); transition: 0.3s; }
+    .nav-button i { font-size: 20px; transition: 0.3s; }
+    .nav-button span { font-size: 10px; font-weight: 600; }
+    .nav-button.active { color: white; }
+    .nav-button.active i { transform: translateY(-3px) scale(1.1); color: var(--neon-blue); filter: drop-shadow(0 0 8px rgba(10,132,255,0.6)); }
+  </style>
+</head>
+<body>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast-container">
+    <i id="toastIcon" class="toast-icon fa-solid fa-bell"></i>
+    <span id="toastMessage">Notification</span>
+  </div>
+
+  <canvas id="networkCanvas"></canvas>
+
+  <div id="app">
+    
+    <header class="topbar">
+      <!-- TA BANNIÈRE LOGO CARRÉE ANIMÉE -->
+      <img src="https://raw.githubusercontent.com/miniappprem/image/b8cd38333e1d9d721c861e8ee7051d5057f24cca/IMG_9941.jpeg" alt="Logo Principal" class="banner-logo" id="mainAppLogo">
+      <div class="brand-subtitle">Réseau Certifié Premium</div>
+    </header>
+
+    <!-- PAGE ACCUEIL -->
+    <section id="homePage" class="page active">
+      <select id="categorySelect" class="custom-select">
+        <option value="Toutes">🔌 TOUS LES SECTEURS</option>
+        <option value="Paris & IDF">Paris & IDF</option>
+        <option value="Sud">Sud</option>
+        <option value="Nord">Nord</option>
+        <option value="Est">Est</option>
+        <option value="Ouest">Ouest</option>
+      </select>
+      <div id="cardsContainer" class="cards"></div>
+    </section>
+
+    <!-- PAGE CLASSEMENT -->
+    <section id="rankingPage" class="page">
+      <h2 style="text-align:center; color:var(--gold); font-weight:800; font-size:22px; margin-top:0;">🏆 Top Plugs</h2>
+      <div id="rankingContainer"></div>
+    </section>
+
+    <!-- PAGE RESEAUX -->
+    <section id="networksPage" class="page">
+      <h2 style="text-align:center; font-weight:800; font-size:22px; margin-top:0; margin-bottom: 25px;">🌐 Nos Réseaux</h2>
+      
+      <!-- CANAL TELEGRAM -->
+      <a href="https://t.me/+O55o8n1EZkA4Mjc0" target="_blank" class="network-card">
+        <div class="network-icon"><i class="fa-brands fa-telegram"></i></div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:16px;">Canal Telegram Officiel</h4>
+          <span style="font-size:12px; color:var(--text-muted);">Rejoignez le canal principal</span>
+        </div>
+      </a>
+
+      <!-- INSTAGRAM -->
+      <a href="https://www.instagram.com/spiro2france_1?igsh=MTI0YW4weWFiYmEyeQ%3D%3D&utm_source=qr" target="_blank" class="network-card">
+        <div class="network-icon" style="color: var(--neon-pink); background: rgba(255, 45, 85, 0.15);"><i class="fa-brands fa-instagram"></i></div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:16px;">Instagram</h4>
+          <span style="font-size:12px; color:var(--text-muted);">Suivez notre actualité en images</span>
+        </div>
+      </a>
+
+      <!-- CANAL POTATO -->
+      <a href="https://tato.im/spiro2france5" target="_blank" class="network-card">
+        <div class="network-icon" style="color: var(--neon-green); background: rgba(48, 209, 88, 0.15);"><i class="fa-solid fa-paper-plane"></i></div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:16px;">Canal Potato</h4>
+          <span style="font-size:12px; color:var(--text-muted);">Accédez à notre premier canal Potato</span>
+        </div>
+      </a>
+
+      <!-- CANAL POTATO 2 -->
+      <a href="https://tato.im/spiro2france" target="_blank" class="network-card">
+        <div class="network-icon" style="color: var(--neon-green); background: rgba(48, 209, 88, 0.15);"><i class="fa-regular fa-paper-plane"></i></div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:16px;">Canal Potato 2</h4>
+          <span style="font-size:12px; color:var(--text-muted);">Accédez à notre second canal Potato</span>
+        </div>
+      </a>
+
+      <!-- CANAL LE MONDE DES PLUG -->
+      <a href="https://tato.im/lemondedesplug1" target="_blank" class="network-card">
+        <div class="network-icon" style="color: var(--gold); background: rgba(255, 214, 10, 0.15);"><i class="fa-solid fa-globe"></i></div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:16px;">Le Monde des Plug</h4>
+          <span style="font-size:12px; color:var(--text-muted);">Découvrez notre univers</span>
+        </div>
+      </a>
+    </section>
+
+    <!-- PAGE PROFIL & ADMIN -->
+    <section id="profilePage" class="page">
+      
+      <!-- CARTE UTILISATEUR -->
+      <div class="user-profile-card">
+        <img src="https://via.placeholder.com/150/111/00f3ff?text=USER" id="userAvatar" class="user-avatar" alt="Profil">
+        <h3 id="userName" class="user-name">Membre VIP</h3>
+        <div style="color:var(--text-muted); font-size:12px; font-family:monospace;">ID: <span id="userId">***</span></div>
+        
+        <div class="user-stats">
+          <div>
+            <div class="stat-title">Dernier Vote</div>
+            <div class="stat-value" id="userBestPlug" style="color:var(--neon-blue);">Aucun</div>
+          </div>
+          <div>
+            <div class="stat-title">Statut</div>
+            <div class="stat-value" style="color:var(--neon-green);">Vérifié <i class="fa-solid fa-check-circle"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCÈS ADMIN : CLAVIER TACTILE iOS -->
+      <div id="adminLoginSection" class="numpad-container">
+        <h3 style="margin-top:0; font-weight:700;"><i class="fa-solid fa-lock" style="color:var(--text-muted);"></i> Panel Admin</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:20px;">Code secret requis</p>
+        
+        <div class="pin-display">
+          <div class="pin-dot" id="pin1"></div>
+          <div class="pin-dot" id="pin2"></div>
+          <div class="pin-dot" id="pin3"></div>
+          <div class="pin-dot" id="pin4"></div>
+        </div>
+
+        <div class="numpad">
+          <button class="numpad-btn" onclick="addPin('1')">1</button>
+          <button class="numpad-btn" onclick="addPin('2')">2</button>
+          <button class="numpad-btn" onclick="addPin('3')">3</button>
+          <button class="numpad-btn" onclick="addPin('4')">4</button>
+          <button class="numpad-btn" onclick="addPin('5')">5</button>
+          <button class="numpad-btn" onclick="addPin('6')">6</button>
+          <button class="numpad-btn" onclick="addPin('7')">7</button>
+          <button class="numpad-btn" onclick="addPin('8')">8</button>
+          <button class="numpad-btn" onclick="addPin('9')">9</button>
+          <button class="numpad-btn empty"></button>
+          <button class="numpad-btn" onclick="addPin('0')">0</button>
+          <button class="numpad-btn" onclick="removePin()" style="color:var(--text-muted); font-size:22px;"><i class="fa-solid fa-delete-left"></i></button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD ADMIN (Caché par défaut) -->
+      <div id="adminDashboardSection" class="numpad-container hidden" style="text-align:left;">
+        <h3 style="margin-top:0; color:var(--neon-green);"><i class="fa-solid fa-database"></i> Éditeur d'Annonces</h3>
+        
+        <input type="hidden" id="plugIdToEdit">
+        <input type="text" id="plugName" class="input-style" placeholder="Nom de l'établissement">
+        <input type="text" id="plugImgLink" class="input-style" placeholder="URL de l'image">
+        <select id="plugCity" class="input-style">
+          <option value="Paris & IDF">Paris & IDF</option>
+          <option value="Sud">Sud</option>
+          <option value="Nord">Nord</option>
+          <option value="Est">Est</option>
+          <option value="Ouest">Ouest</option>
+        </select>
+        <select id="plugType" class="input-style">
+          <option value="Sur Place">Sur Place</option>
+          <option value="Livraison">Livraison</option>
+          <option value="Les 2">Les 2</option>
+        </select>
+        <textarea id="plugDesc" class="input-style" placeholder="Description courte..." rows="3"></textarea>
+        <input type="url" id="plugLink" class="input-style" placeholder="Lien Telegram (https://t.me/...)">
+        
+        <button id="btnSavePlug" class="btn-submit" style="background:var(--neon-green);">Publier sur l'App</button>
+        <button id="btnCancelEdit" class="btn-submit hidden" style="background:rgba(255,255,255,0.1);">Annuler</button>
+
+        <h4 style="margin-top:25px; border-top:1px solid var(--glass-border); padding-top:20px;">Gérer les annonces</h4>
+        <div id="adminListContainer"></div>
+      </div>
+
+      <!-- SIGNATURE DEVELOPPEUR -->
+      <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+        <span style="font-size: 10px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-weight: 600;">
+          Designed & Coded by <strong style="color:var(--neon-blue);">LE DESIGNER</strong>
+        </span>
+      </div>
+
+    </section>
+
+    <!-- NAV BAS FLOTTANTE iOS -->
+    <div class="bottom-nav-container">
+      <nav class="bottom-nav">
+        <button class="nav-button active" data-page="homePage"><i class="fa-solid fa-house"></i><span>Accueil</span></button>
+        <button class="nav-button" data-page="rankingPage"><i class="fa-solid fa-trophy"></i><span>Top</span></button>
+        <button class="nav-button" data-page="networksPage"><i class="fa-solid fa-globe"></i><span>Réseaux</span></button>
+        <button class="nav-button" data-page="profilePage"><i class="fa-solid fa-user-astronaut"></i><span>Profil</span></button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- MODAL D'INFORMATION -->
+  <div class="modal-overlay" id="plugModal">
+    <div class="modal-content">
+      <div class="drag-indicator"></div>
+      <button class="close-modal" id="closeModal"><i class="fa-solid fa-xmark"></i></button>
+      <img src="" id="modalImg" class="modal-img">
+      <div class="badge-lumin" id="modalSecteur"></div>
+      <h2 id="modalName" style="margin: 5px 0 10px; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;"></h2>
+      
+      <div class="modal-tags">
+        <span class="modal-tag tag-sur-place" id="tagSurPlace">Sur Place</span>
+        <span class="modal-tag tag-livraison" id="tagLivraison">Livraison</span>
+      </div>
+      
+      <p id="modalDesc" style="font-size: 15px; color: var(--text-muted); margin: 20px 0; line-height: 1.4;"></p>
+      
+      <a href="#" id="modalLink" target="_blank" class="btn-action btn-telegram"><i class="fa-brands fa-telegram"></i> Contacter le Plug</a>
+      <button id="modalVoteBtn" class="btn-action btn-vote"><i class="fa-regular fa-star"></i> Voter pour ce Plug</button>
+    </div>
+  </div>
+
+  <!-- FIREBASE & LOGIQUE APP -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, increment } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCkmPOaviTX-tQgVQ2Zec81hgjsoNf6SHs",
+      authDomain: "spiro2france.firebaseapp.com",
+      projectId: "spiro2france",
+      storageBucket: "spiro2france.firebasestorage.app",
+      messagingSenderId: "195024616333",
+      appId: "1:195024616333:web:fab74dc514599891fa5bc4"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    let plugs = [];
+    let currentOpenedPlugId = null;
+    const tg = window.Telegram.WebApp;
+
+    // FONCTION HAPTIQUE iOS (Vibration)
+    function vibrate(style = 'light') {
+      if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style);
+    }
+
+    // FONCTION TOAST (Notification en haut)
+    function showToast(msg, iconClass = "fa-solid fa-bell", color = "var(--neon-blue)") {
+      const toast = document.getElementById("toast");
+      document.getElementById("toastMessage").innerText = msg;
+      document.getElementById("toastIcon").className = `toast-icon ${iconClass}`;
+      document.getElementById("toastIcon").style.color = color;
+      toast.classList.add("show");
+      vibrate('medium');
+      setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+
+    // INIT UTILISATEUR TELEGRAM ET BIENVENUE
+    tg.expand();
+    const tgUser = tg.initDataUnsafe?.user;
+    let welcomeName = "l'Élite";
+    
+    if (tgUser) {
+      welcomeName = tgUser.first_name;
+      document.getElementById('userName').innerText = tgUser.first_name;
+      document.getElementById('userId').innerText = tgUser.id;
+      if(tgUser.photo_url) document.getElementById('userAvatar').src = tgUser.photo_url;
+    }
+    
+    // Message de bienvenue stylé au lancement
+    setTimeout(() => { showToast(`Bienvenue ${welcomeName} ⚡️`, "fa-solid fa-bolt", "var(--gold)"); }, 800);
+
+    // GESTION CLAVIER TACTILE (PIN: 2026)
+    let currentPin = "";
+    const correctPin = "2026";
+
+    window.addPin = function(num) {
+      if(currentPin.length < 4) {
+        vibrate('light');
+        currentPin += num;
+        updatePinDisplay();
+        if(currentPin.length === 4) checkPin();
+      }
+    };
+    window.removePin = function() {
+      if(currentPin.length > 0) {
+        vibrate('light');
+        currentPin = currentPin.slice(0, -1);
+        updatePinDisplay();
+      }
+    };
+    function updatePinDisplay() {
+      for(let i=1; i<=4; i++) {
+        const dot = document.getElementById(`pin${i}`);
+        if(i <= currentPin.length) dot.classList.add('filled');
+        else dot.classList.remove('filled');
+      }
+    }
+    function checkPin() {
+      if(currentPin === correctPin) {
+        vibrate('heavy');
+        showToast("Accès Admin Autorisé", "fa-solid fa-unlock", "var(--neon-green)");
+        setTimeout(() => {
+          document.getElementById("adminLoginSection").classList.add("hidden");
+          document.getElementById("adminDashboardSection").classList.remove("hidden");
+        }, 500);
+      } else {
+        vibrate('heavy');
+        showToast("Code PIN Incorrect", "fa-solid fa-triangle-exclamation", "var(--neon-pink)");
+        setTimeout(() => { currentPin = ""; updatePinDisplay(); }, 400);
+      }
+    }
+
+    // STATS LOCALES
+    function updateLocalStats() {
+      const bestPlugVoted = localStorage.getItem('lastVotedPlugName');
+      if(bestPlugVoted) document.getElementById('userBestPlug').innerText = bestPlugVoted;
+    }
+    updateLocalStats();
+
+    // CHARGEMENT DONNEES
+    async function loadData() {
+      try {
+        const snapshot = await getDocs(collection(db, "plugs"));
+        plugs = [];
+        snapshot.forEach(doc => { plugs.push({ id: doc.id, ...doc.data() }); });
+        renderApp(); renderAdminList();
+      } catch(e) { console.log("Erreur de chargement Firebase."); }
+    }
+
+    // AFFICHAGE CARTES
+    function renderApp() {
+      const selected = document.getElementById("categorySelect").value;
+      const filtered = selected === "Toutes" ? plugs : plugs.filter(p => p.city === selected);
+      
+      document.getElementById("cardsContainer").innerHTML = filtered.map(p => `
+        <div class="place-card" data-id="${p.id}">
+          <img class="place-image" src="${p.img || 'https://via.placeholder.com/300x150/111/00f3ff'}">
+          <div class="badge-lumin">📍 ${p.city}</div>
+          <h4 class="place-name">${p.name}</h4>
+          <span style="font-size:13px; color:var(--text-muted); font-weight:600;"><i class="fa-solid fa-star" style="color:var(--gold)"></i> ${p.votes || 0} Votes</span>
+        </div>
+      `).join("");
+
+      document.querySelectorAll('.place-card').forEach(card => {
+        card.addEventListener('click', () => { vibrate('light'); openModal(card.getAttribute('data-id')); });
+      });
+      renderRanking();
+    }
+
+    // CLASSEMENT
+    function renderRanking() {
+      const sorted = [...plugs].sort((a, b) => (b.votes || 0) - (a.votes || 0));
+      document.getElementById("rankingContainer").innerHTML = sorted.map((p, i) => `
+        <div class="ranking-row">
+          <div style="font-size:28px; width:40px; text-align:center;">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '<span style="font-size:16px; color:#888;">#'+(i+1)+'</span>'}</div>
+          <img src="${p.img || 'https://via.placeholder.com/100/111/00f3ff'}" style="width:55px; height:55px; border-radius:16px; object-fit:cover;">
+          <div style="flex:1;">
+            <h4 style="margin:0 0 4px; font-size:16px;">${p.name}</h4>
+            <span style="font-size:12px; color:var(--text-muted);">${p.type} • ${p.city}</span>
+          </div>
+          <div style="color:var(--gold); font-weight:800; font-size:18px;">${p.votes || 0} <i class="fa-solid fa-star" style="font-size:14px;"></i></div>
+        </div>
+      `).join("");
+    }
+
+    // MODAL
+    const modal = document.getElementById('plugModal');
+    function openModal(id) {
+      const plug = plugs.find(p => p.id === id);
+      if(!plug) return;
+      currentOpenedPlugId = plug.id;
+      
+      document.getElementById('modalName').innerText = plug.name;
+      document.getElementById('modalImg').src = plug.img || `https://via.placeholder.com/150/111/00f3ff`;
+      document.getElementById('modalSecteur').innerText = plug.city;
+      document.getElementById('modalDesc').innerText = plug.desc || "Aucune description fournie.";
+      document.getElementById('modalLink').href = plug.link || "#";
+      
+      document.getElementById('tagSurPlace').style.display = (plug.type === "Sur Place" || plug.type === "Les 2") ? "inline-block" : "none";
+      document.getElementById('tagLivraison').style.display = (plug.type === "Livraison" || plug.type === "Les 2") ? "inline-block" : "none";
+      
+      modal.classList.add('active');
+    }
+    
+    document.getElementById('closeModal').addEventListener('click', () => { vibrate('light'); modal.classList.remove('active'); });
+
+    // SYSTEME VOTE
+    document.getElementById("modalVoteBtn").addEventListener("click", async () => {
+      if(!currentOpenedPlugId) return;
+      vibrate('medium');
+      document.getElementById("modalVoteBtn").innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> Validation...";
+      
+      try {
+        const plugRef = doc(db, "plugs", currentOpenedPlugId);
+        await updateDoc(plugRef, { votes: increment(1) });
+        
+        const pIndex = plugs.findIndex(p => p.id === currentOpenedPlugId);
+        plugs[pIndex].votes = (plugs[pIndex].votes || 0) + 1;
+        
+        localStorage.setItem('lastVotedPlugName', plugs[pIndex].name);
+        updateLocalStats();
+        renderApp();
+        
+        modal.classList.remove('active');
+        setTimeout(() => {
+          showToast(`Vote enregistré pour ${plugs[pIndex].name} !`, "fa-solid fa-heart", "var(--neon-pink)");
+          document.getElementById("modalVoteBtn").innerHTML = "<i class='fa-regular fa-star'></i> Voter pour ce Plug";
+        }, 400);
+
+      } catch(e) {
+        showToast("Erreur de connexion.", "fa-solid fa-circle-xmark", "var(--neon-pink)");
+        document.getElementById("modalVoteBtn").innerHTML = "<i class='fa-regular fa-star'></i> Voter pour ce Plug";
+      }
+    });
+
+    document.getElementById("categorySelect").addEventListener('change', () => { vibrate('light'); renderApp(); });
+
+    // NAVIGATION BASSE
+    document.querySelectorAll(".nav-button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if(!btn.classList.contains('active')) vibrate('light');
+        document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+        document.getElementById(btn.dataset.page).classList.add("active");
+        document.querySelectorAll(".nav-button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+
+    // ADMIN CRUD
+    function resetForm() {
+      document.getElementById("plugIdToEdit").value = "";
+      document.getElementById("plugName").value = "";
+      document.getElementById("plugImgLink").value = "";
+      document.getElementById("plugDesc").value = "";
+      document.getElementById("plugLink").value = "";
+      document.getElementById("btnSavePlug").innerText = "Publier sur l'App";
+      document.getElementById("btnCancelEdit").classList.add("hidden");
+    }
+
+    document.getElementById("btnCancelEdit").addEventListener("click", () => { vibrate('light'); resetForm(); });
+
+    document.getElementById("btnSavePlug").addEventListener("click", async () => {
+      vibrate('medium');
+      const id = document.getElementById("plugIdToEdit").value;
+      const data = {
+        name: document.getElementById("plugName").value,
+        img: document.getElementById("plugImgLink").value,
+        city: document.getElementById("plugCity").value,
+        type: document.getElementById("plugType").value,
+        desc: document.getElementById("plugDesc").value,
+        link: document.getElementById("plugLink").value,
+      };
+
+      if(!data.name) { showToast("Nom requis", "fa-solid fa-circle-exclamation", "var(--neon-pink)"); return; }
+      document.getElementById("btnSavePlug").innerText = "Traitement...";
+
+      try {
+        if(id) {
+          await updateDoc(doc(db, "plugs", id), data);
+          showToast("Annonce modifiée !", "fa-solid fa-check", "var(--neon-green)");
+        } else {
+          data.votes = 0; 
+          await addDoc(collection(db, "plugs"), data);
+          showToast("Annonce publiée !", "fa-solid fa-rocket", "var(--neon-blue)");
+        }
+        resetForm(); loadData();
+      } catch (e) {
+        showToast("Erreur Firebase.", "fa-solid fa-xmark", "var(--neon-pink)");
+        document.getElementById("btnSavePlug").innerText = "Réessayer";
+      }
+    });
+
+    function renderAdminList() {
+      const container = document.getElementById("adminListContainer");
+      container.innerHTML = plugs.map(p => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:rgba(255,255,255,0.05); border-radius:14px; margin-bottom:8px;">
+          <div><strong style="font-size:14px;">${p.name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${p.city} - ${p.votes||0} votes</span></div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="window.editPlug('${p.id}')" style="background:var(--neon-blue); color:white; padding:8px 12px; border-radius:10px;"><i class="fa-solid fa-pen"></i></button>
+            <button onclick="window.deletePlug('${p.id}')" style="background:var(--neon-pink); color:white; padding:8px 12px; border-radius:10px;"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    window.editPlug = (id) => {
+      vibrate('light');
+      const p = plugs.find(x => x.id === id); if(!p) return;
+      document.getElementById("plugIdToEdit").value = p.id;
+      document.getElementById("plugName").value = p.name;
+      document.getElementById("plugImgLink").value = p.img || "";
+      document.getElementById("plugCity").value = p.city;
+      document.getElementById("plugType").value = p.type;
+      document.getElementById("plugDesc").value = p.desc || "";
+      document.getElementById("plugLink").value = p.link || "";
+      document.getElementById("btnSavePlug").innerText = "Enregistrer";
+      document.getElementById("btnCancelEdit").classList.remove("hidden");
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    };
+
+    window.deletePlug = async (id) => {
+      vibrate('heavy');
+      if(confirm("Supprimer DÉFINITIVEMENT cette annonce ?")) {
+        try { await deleteDoc(doc(db, "plugs", id)); showToast("Annonce supprimée", "fa-solid fa-trash", "var(--text-muted)"); loadData(); }
+        catch(e) { showToast("Erreur", "fa-solid fa-xmark", "var(--neon-pink)"); }
+      }
+    };
+
+    // ANIMATION FOND
+    const canvas = document.getElementById('networkCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize); resize();
+    
+    for(let i=0; i<30; i++) particles.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, vx: (Math.random()-0.5)*0.5, vy: (Math.random()-0.5)*0.5, color: Math.random() > 0.5 ? '#0a84ff' : '#ff2d55' });
+    function drawNetwork() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for(let i=0; i<particles.length; i++) {
+        let p = particles[i]; p.x += p.vx; p.y += p.vy;
+        if(p.x < 0 || p.x > canvas.width) p.vx *= -1; if(p.y < 0 || p.y > canvas.height) p.vy *= -1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI*2); ctx.fillStyle = p.color; ctx.fill();
+        for(let j=i+1; j<particles.length; j++) {
+          let dist = Math.hypot(p.x - particles[j].x, p.y - particles[j].y);
+          if(dist < 100) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 - dist/100})`; ctx.stroke(); }
+        }
+      } requestAnimationFrame(drawNetwork);
+    }
+    drawNetwork();
+
+    loadData();
+  </script>
+</body>
+</html>
